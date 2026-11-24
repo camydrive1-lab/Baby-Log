@@ -45,7 +45,6 @@
       color: #2D3748;
       -webkit-tap-highlight-color: transparent;
     }
-    /* Custom subtle scrollbar */
     ::-webkit-scrollbar {
       width: 6px;
       height: 6px;
@@ -87,7 +86,7 @@
       <!-- Permission / Mode Pill -->
       <button id="mode-toggle-btn" onclick="handleModeToggleClick()" class="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold transition-all shadow-sm border">
         <span id="mode-icon">🔓</span>
-        <span id="mode-label">家長完整模式</span>
+        <span id="mode-label">切換傭人鎖定模式</span>
       </button>
     </div>
   </header>
@@ -98,8 +97,8 @@
     <section class="bg-white rounded-3xl p-3.5 shadow-sm border border-cream-200 space-y-2.5">
       <div class="flex items-center justify-between px-1">
         <span class="text-xs font-semibold text-gray-500">目前紀錄人 / Recorded By</span>
-        <span id="sync-indicator-pill" class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-          未設定 Google Form
+        <span id="sync-indicator-pill" class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-sage-50 text-sage-700 border border-sage-200">
+          ☁️ 雲端同步已就緒
         </span>
       </div>
       <div class="grid grid-cols-4 gap-2" id="role-selector">
@@ -152,6 +151,16 @@
           <!-- Populated after helper submits -->
         </div>
       </div>
+    </section>
+
+    <!-- Offline Queue Alert Banner (Shown if any entries failed network sync) -->
+    <section id="offline-queue-banner" class="hidden bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-center justify-between gap-2">
+      <div class="text-xs text-amber-800 font-medium">
+        ⚠️ 有 <strong id="offline-queue-count">0</strong> 筆紀錄尚未同步至雲端
+      </div>
+      <button type="button" onclick="retryUnsyncedEntries()" class="text-xs font-bold bg-amber-600 text-white px-3 py-1.5 rounded-xl hover:bg-amber-700 transition shrink-0">
+        🔄 立即補傳
+      </button>
     </section>
 
     <!-- Today's Summary Dashboard (Parents Mode ONLY) -->
@@ -451,18 +460,18 @@
 
       <!-- Submit CTA Button -->
       <button type="button" id="submit-btn" onclick="submitLogEntry()" class="w-full py-4 rounded-2xl bg-sage-500 hover:bg-sage-600 active:scale-[0.99] text-white font-bold text-base shadow-md shadow-sage-500/20 transition-all flex items-center justify-center gap-2">
-        <span>☁️ 提交並同步至 Google Form</span>
+        <span>☁️ 提交並同步至 Google Sheet</span>
       </button>
     </section>
 
-    <!-- PARENTS ONLY: Navigation Tabs for History vs Google Form Setup -->
+    <!-- PARENTS ONLY: Navigation Tabs for History vs Settings -->
     <section id="parent-workspace" class="space-y-4">
       <div class="flex bg-cream-100 p-1.5 rounded-2xl border border-cream-200">
         <button type="button" id="tab-history-btn" onclick="switchParentTab('history')" class="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all bg-white text-sage-700 shadow-sm">
           📋 歷史紀錄明細 History
         </button>
         <button type="button" id="tab-settings-btn" onclick="switchParentTab('settings')" class="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all text-gray-500 hover:text-gray-700">
-          ⚙️ Google Form 同步設定
+          ⚙️ 同步狀態與權限設定
         </button>
       </div>
 
@@ -484,71 +493,80 @@
         </div>
       </div>
 
-      <!-- Tab 2: Google Form & PIN Settings Wizard -->
+      <!-- Tab 2: Built-in Sync Status, Helper Link & PIN Settings -->
       <div id="view-settings" class="hidden space-y-4">
-        <!-- Smart URL Parser Card -->
-        <div class="bg-white rounded-3xl p-4 sm:p-5 border border-cream-200 shadow-sm space-y-4">
-          <div>
-            <h3 class="text-sm font-bold text-gray-800 flex items-center gap-1.5">
-              <span>🔗</span> Google Form 一鍵自動對接精靈
-            </h3>
-            <p class="text-xs text-gray-500 mt-1 leading-relaxed">
-              在 Google Form 點擊右上角「⋮」→「<strong>取得預先填寫的連結 (Get pre-filled link)</strong>」，隨便填入測試內容後按「取得連結」並貼在下方，系統會自動擷取網址與所有欄位代碼！
-            </p>
-          </div>
-
-          <div class="space-y-2 bg-sage-50/70 p-3.5 rounded-2xl border border-sage-200">
-            <label class="block text-xs font-bold text-sage-800">貼上預填連結 (Pre-filled URL) 自動解析：</label>
-            <textarea id="prefill-url-input" rows="2" placeholder="https://docs.google.com/forms/d/e/1FAIpQL.../viewform?usp=pp_url&entry.12345=..." class="w-full bg-white border border-sage-200 rounded-xl p-2.5 text-xs text-gray-700 focus:outline-none focus:border-sage-500"></textarea>
-            <button type="button" onclick="parsePrefilledUrl()" class="w-full py-2 rounded-xl bg-sage-600 text-white text-xs font-bold hover:bg-sage-700 transition">
-              ✨ 自動解析並填入下方欄位
+        <!-- Helper Dedicated Locked URL Card -->
+        <div class="bg-sage-50 rounded-3xl p-4 sm:p-5 border border-sage-200 shadow-sm space-y-3">
+          <h3 class="text-sm font-bold text-sage-800 flex items-center gap-1.5">
+            <span>🧑🏽‍🍼</span> 一鍵複製「傭人專用鎖定網址」
+          </h3>
+          <p class="text-xs text-sage-700 leading-relaxed">
+            直接複製下方網址傳給傭人／陪月。打開後會<strong>自動鎖定為「純輸入模式」</strong>，隱藏所有歷史數據、統計及設定頁面，且資料同樣自動同步至 Google Sheet：
+          </p>
+          <div class="flex gap-2">
+            <input type="text" readonly id="helper-share-url" class="flex-1 bg-white border border-sage-200 rounded-xl px-3 py-2 text-xs text-gray-600 font-mono" />
+            <button type="button" onclick="copyHelperLink()" class="px-4 py-2 rounded-xl bg-sage-600 text-white text-xs font-bold hover:bg-sage-700 transition shrink-0">
+              📋 複製連結
             </button>
           </div>
+        </div>
 
-          <!-- Manual / Parsed Form Endpoint & Entry IDs -->
+        <!-- Built-in Google Form Config Card -->
+        <div class="bg-white rounded-3xl p-4 sm:p-5 border border-cream-200 shadow-sm space-y-4">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <h3 class="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+                <span>✅</span> 已內建專屬 Google Form 同步設定
+              </h3>
+              <p class="text-xs text-gray-500 mt-1 leading-relaxed">
+                此版本已將您的 Google Form 端點與全部 7 個欄位代碼寫入程式預設值，<strong>任何家庭成員打開網頁即可直接同步，無需任何手動設定</strong>。
+              </p>
+            </div>
+          </div>
+
           <div class="space-y-3 pt-1">
             <div>
               <label class="block text-xs font-bold text-gray-700 mb-1">Form 提交端點網址 (<code class="text-sage-600">formResponse</code> URL)</label>
-              <input type="url" id="cfg-form-url" placeholder="https://docs.google.com/forms/d/e/.../formResponse" class="w-full bg-cream-50 border border-cream-200 rounded-xl px-3 py-2 text-xs text-gray-800" />
+              <input type="url" id="cfg-form-url" class="w-full bg-cream-50 border border-cream-200 rounded-xl px-3 py-2 text-xs text-gray-800 font-mono" />
             </div>
 
             <div class="grid grid-cols-2 gap-2.5">
               <div>
                 <label class="block text-[11px] font-semibold text-gray-600 mb-1">1. 紀錄人 (Recorded By)</label>
-                <input type="text" id="cfg-entry-role" placeholder="entry.111111" class="w-full bg-cream-50 border border-cream-200 rounded-xl px-2.5 py-2 text-xs font-mono" />
+                <input type="text" id="cfg-entry-role" class="w-full bg-cream-50 border border-cream-200 rounded-xl px-2.5 py-2 text-xs font-mono" />
               </div>
               <div>
                 <label class="block text-[11px] font-semibold text-gray-600 mb-1">2. 日期 (Date)</label>
-                <input type="text" id="cfg-entry-date" placeholder="entry.222222" class="w-full bg-cream-50 border border-cream-200 rounded-xl px-2.5 py-2 text-xs font-mono" />
+                <input type="text" id="cfg-entry-date" class="w-full bg-cream-50 border border-cream-200 rounded-xl px-2.5 py-2 text-xs font-mono" />
               </div>
               <div>
                 <label class="block text-[11px] font-semibold text-gray-600 mb-1">3. 時間 (Time)</label>
-                <input type="text" id="cfg-entry-time" placeholder="entry.333333" class="w-full bg-cream-50 border border-cream-200 rounded-xl px-2.5 py-2 text-xs font-mono" />
+                <input type="text" id="cfg-entry-time" class="w-full bg-cream-50 border border-cream-200 rounded-xl px-2.5 py-2 text-xs font-mono" />
               </div>
               <div>
                 <label class="block text-[11px] font-semibold text-gray-600 mb-1">4. 紀錄類別 (Category)</label>
-                <input type="text" id="cfg-entry-category" placeholder="entry.444444" class="w-full bg-cream-50 border border-cream-200 rounded-xl px-2.5 py-2 text-xs font-mono" />
+                <input type="text" id="cfg-entry-category" class="w-full bg-cream-50 border border-cream-200 rounded-xl px-2.5 py-2 text-xs font-mono" />
               </div>
               <div>
                 <label class="block text-[11px] font-semibold text-gray-600 mb-1">5. 奶量 / 時長 (Details)</label>
-                <input type="text" id="cfg-entry-details" placeholder="entry.555555" class="w-full bg-cream-50 border border-cream-200 rounded-xl px-2.5 py-2 text-xs font-mono" />
+                <input type="text" id="cfg-entry-details" class="w-full bg-cream-50 border border-cream-200 rounded-xl px-2.5 py-2 text-xs font-mono" />
               </div>
               <div>
                 <label class="block text-[11px] font-semibold text-gray-600 mb-1">6. 大小便狀態 (Status)</label>
-                <input type="text" id="cfg-entry-diaper" placeholder="entry.666666" class="w-full bg-cream-50 border border-cream-200 rounded-xl px-2.5 py-2 text-xs font-mono" />
+                <input type="text" id="cfg-entry-diaper" class="w-full bg-cream-50 border border-cream-200 rounded-xl px-2.5 py-2 text-xs font-mono" />
               </div>
               <div class="col-span-2">
                 <label class="block text-[11px] font-semibold text-gray-600 mb-1">7. 備註 (Notes)</label>
-                <input type="text" id="cfg-entry-notes" placeholder="entry.777777" class="w-full bg-cream-50 border border-cream-200 rounded-xl px-2.5 py-2 text-xs font-mono" />
+                <input type="text" id="cfg-entry-notes" class="w-full bg-cream-50 border border-cream-200 rounded-xl px-2.5 py-2 text-xs font-mono" />
               </div>
             </div>
 
             <div class="flex gap-2 pt-2">
-              <button type="button" onclick="saveGoogleFormConfig()" class="flex-1 py-2.5 rounded-xl bg-sage-500 text-white text-xs font-bold hover:bg-sage-600 transition">
-                💾 儲存設定 Save
+              <button type="button" onclick="sendTestSubmission()" class="flex-1 py-2.5 rounded-xl bg-sage-500 text-white text-xs font-bold hover:bg-sage-600 transition">
+                🚀 發送測試數據至 Google Sheet
               </button>
-              <button type="button" onclick="sendTestSubmission()" class="flex-1 py-2.5 rounded-xl bg-cream-100 text-gray-700 border border-cream-200 text-xs font-bold hover:bg-cream-200 transition">
-                🚀 發送測試數據 Test
+              <button type="button" onclick="resetToDefaultConfig()" class="px-3 py-2.5 rounded-xl bg-cream-100 text-gray-700 border border-cream-200 text-xs font-bold hover:bg-cream-200 transition">
+                還原內建預設
               </button>
             </div>
           </div>
@@ -560,7 +578,7 @@
             <span>🔐</span> 家長模式解鎖密碼 (4位數 PIN 碼)
           </h3>
           <p class="text-xs text-gray-500">
-            切換至「傭人純輸入模式」後，必須輸入此 PIN 碼才能解鎖查看歷史紀錄、刪除資料或修改 Google Form 設定（預設為 <code class="font-bold text-sage-700">1234</code>）。
+            切換至「傭人純輸入模式」後，必須輸入此 PIN 碼才能解鎖查看歷史紀錄、刪除資料或查看設定（預設為 <code class="font-bold text-sage-700">1234</code>）。
           </p>
           <div class="flex gap-2">
             <input type="password" inputmode="numeric" maxlength="4" id="cfg-parent-pin" placeholder="4位數字 (預設 1234)" class="flex-1 bg-cream-50 border border-cream-200 rounded-xl px-3.5 py-2.5 text-sm font-mono tracking-widest text-center" />
@@ -574,13 +592,13 @@
 
   </main>
 
-  <!-- Custom PIN Modal (Replaces prompt/alert) -->
+  <!-- Custom PIN Modal -->
   <div id="pin-modal" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
     <div class="bg-white rounded-3xl max-w-xs w-full p-5 shadow-xl border border-cream-200 space-y-4">
       <div class="text-center space-y-1">
         <div class="text-2xl">🔐</div>
-        <h3 class="text-base font-bold text-gray-800" id="pin-modal-title">輸入家長 PIN 碼</h3>
-        <p class="text-xs text-gray-500" id="pin-modal-desc">請輸入 4 位數密碼以解鎖家長完整權限</p>
+        <h3 class="text-base font-bold text-gray-800">輸入家長 PIN 碼</h3>
+        <p class="text-xs text-gray-500">請輸入 4 位數密碼以解鎖家長完整權限</p>
       </div>
       <input type="password" inputmode="numeric" maxlength="4" id="pin-modal-input" placeholder="••••" class="w-full bg-cream-50 border-2 border-cream-200 focus:border-sage-500 rounded-2xl py-3 text-center text-2xl font-bold tracking-[0.5em] focus:outline-none" />
       <div class="grid grid-cols-2 gap-2">
@@ -590,7 +608,7 @@
     </div>
   </div>
 
-  <!-- Custom Delete Confirmation Modal (Replaces confirm) -->
+  <!-- Custom Delete Confirmation Modal -->
   <div id="delete-modal" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
     <div class="bg-white rounded-3xl max-w-xs w-full p-5 shadow-xl border border-cream-200 space-y-4 text-center">
       <div class="text-2xl">🗑️</div>
@@ -605,11 +623,23 @@
 
   <script>
     // ==========================================
-    // State & Storage Keys
+    // Hardcoded Default Google Form Configuration
+    // (Pre-populated out of the box - Zero setup required!)
     // ==========================================
+    const DEFAULT_GFORM_CONFIG = {
+      formUrl: 'https://docs.google.com/forms/d/e/1FAIpQLSe7iTyw6WbsAF50vpKUjAEEB5Mymp0UMCgIBOE6Jtk7YQvYvA/formResponse',
+      entryRole: 'entry.1769978242',
+      entryDate: 'entry.1681857789',
+      entryTime: 'entry.787771721',
+      entryCategory: 'entry.265192668',
+      entryDetails: 'entry.858016844',
+      entryDiaper: 'entry.1440001554',
+      entryNotes: 'entry.619860787'
+    };
+
     const STORAGE_KEYS = {
       LOGS: 'baby_log_entries_v2',
-      CONFIG: 'baby_log_gform_cfg_v1',
+      CONFIG: 'baby_log_gform_cfg_v2',
       MODE: 'baby_log_helper_mode_v1',
       PIN: 'baby_log_parent_pin_v1',
       ROLE: 'baby_log_active_role_v2',
@@ -621,23 +651,14 @@
       customRoleText: '',
       category: '飲奶 Feeding',
       milkType: '配方奶 Formula',
-      breastMode: 'bottle', // 'bottle' | 'latch'
+      breastMode: 'bottle',
       latchSide: '兩邊 Both',
       foodPortion: '全清 Finished',
       diaperStatus: '不適用 N/A',
       isHelperMode: false,
       parentPin: '1234',
       logs: [],
-      gformConfig: {
-        formUrl: '',
-        entryRole: '',
-        entryDate: '',
-        entryTime: '',
-        entryCategory: '',
-        entryDetails: '',
-        entryDiaper: '',
-        entryNotes: ''
-      },
+      gformConfig: { ...DEFAULT_GFORM_CONFIG },
       pendingDeleteId: null
     };
 
@@ -646,6 +667,7 @@
     // ==========================================
     window.addEventListener('DOMContentLoaded', () => {
       loadFromStorage();
+      checkUrlParameters();
       resetDateTimeToNow();
       selectRole(state.role);
       selectMilkType(state.milkType);
@@ -655,10 +677,29 @@
       selectCategory(state.category);
       applyModeUI();
       populateConfigInputs();
-      updateSyncBadge();
+      updateOfflineQueueBanner();
       renderLogs();
       updateTodayStats();
+
+      // Auto-retry offline queue when connection is restored
+      window.addEventListener('online', () => {
+        retryUnsyncedEntries(true);
+      });
     });
+
+    function checkUrlParameters() {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('mode') === 'helper') {
+          state.isHelperMode = true;
+          state.role = '傭人 Helper';
+          localStorage.setItem(STORAGE_KEYS.MODE, 'true');
+          localStorage.setItem(STORAGE_KEYS.ROLE, '傭人 Helper');
+        }
+      } catch (e) {
+        console.error('URL param parse error:', e);
+      }
+    }
 
     function loadFromStorage() {
       try {
@@ -666,7 +707,12 @@
         if (savedLogs) state.logs = JSON.parse(savedLogs);
 
         const savedCfg = localStorage.getItem(STORAGE_KEYS.CONFIG);
-        if (savedCfg) state.gformConfig = { ...state.gformConfig, ...JSON.parse(savedCfg) };
+        if (savedCfg) {
+          const parsed = JSON.parse(savedCfg);
+          if (parsed && parsed.formUrl) {
+            state.gformConfig = { ...DEFAULT_GFORM_CONFIG, ...parsed };
+          }
+        }
 
         const savedMode = localStorage.getItem(STORAGE_KEYS.MODE);
         if (savedMode === 'true') state.isHelperMode = true;
@@ -690,6 +736,7 @@
 
     function saveLogsToStorage() {
       localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(state.logs));
+      updateOfflineQueueBanner();
     }
 
     // ==========================================
@@ -774,14 +821,12 @@
 
     function handleModeToggleClick() {
       if (!state.isHelperMode) {
-        // Switching FROM Parent Mode TO Helper Input-Only Mode (No PIN required to lock)
         state.isHelperMode = true;
         localStorage.setItem(STORAGE_KEYS.MODE, 'true');
         selectRole('傭人 Helper');
         applyModeUI();
         showToast('🔒 已鎖定為「傭人純輸入模式」', 'success');
       } else {
-        // Switching FROM Helper Mode TO Parent Mode -> Require 4-digit PIN
         document.getElementById('pin-modal-input').value = '';
         document.getElementById('pin-modal').classList.remove('hidden');
         setTimeout(() => document.getElementById('pin-modal-input').focus(), 100);
@@ -993,7 +1038,7 @@
     }
 
     // ==========================================
-    // Submission & Background Google Form Sync
+    // Submission & Silent Background Google Form Sync
     // ==========================================
     async function submitLogEntry() {
       const dateVal = document.getElementById('input-date').value;
@@ -1006,7 +1051,7 @@
       }
 
       if (state.role === '其他 Other' && !document.getElementById('input-custom-role').value.trim()) {
-        showToast('⚠️ 請點選或輸入紀錄人稱呼（例如：爺爺、麻麻）', 'warning');
+        showToast('⚠️ 請點選或輸入紀錄人稱呼（例如：陪月、爺爺、麻麻）', 'warning');
         document.getElementById('input-custom-role').focus();
         return;
       }
@@ -1053,9 +1098,8 @@
 
       const submitBtn = document.getElementById('submit-btn');
       submitBtn.disabled = true;
-      submitBtn.innerHTML = '<span>⏳ 正在傳送同步...</span>';
+      submitBtn.innerHTML = '<span>⏳ 正在同步至 Google Sheet...</span>';
 
-      // Attempt silent background POST to Google Form
       const syncSuccess = await postToGoogleForm({
         role: effectiveRole,
         date: dateVal,
@@ -1085,17 +1129,16 @@
       state.logs.unshift(newEntry);
       saveLogsToStorage();
 
-      // Update UI feedback
       if (syncSuccess) {
-        showToast('✅ 已成功儲存並同步至 Google Form！', 'success');
+        showToast('✅ 已成功儲存並同步至 Google Sheet！', 'success');
       } else {
-        showToast('⚠️ 已本地暫存（尚未設定 Google Form 連結）', 'warning');
+        showToast('⏳ 網絡不穩，已本機暫存（恢復連線後自動補傳）', 'warning');
       }
 
       if (state.isHelperMode) {
         const helperBox = document.getElementById('helper-last-submit-box');
         helperBox.classList.remove('hidden');
-        helperBox.innerHTML = `✅ 最新傳送成功：<strong>${timeVal} ${effectiveCategory}</strong> (${detailsVal !== '-' ? detailsVal : diaperVal}) ${syncSuccess ? '• 已同步至雲端' : ''}`;
+        helperBox.innerHTML = `✅ 最新傳送成功：<strong>${timeVal} ${effectiveCategory}</strong> (${detailsVal !== '-' ? detailsVal : diaperVal}) ${syncSuccess ? '• 已同步至雲端' : '• 離線暫存中'}`;
       }
 
       // Reset inputs for next entry
@@ -1107,7 +1150,7 @@
       resetDateTimeToNow();
 
       submitBtn.disabled = false;
-      submitBtn.innerHTML = '<span>☁️ 提交並同步至 Google Form</span>';
+      submitBtn.innerHTML = '<span>☁️ 提交並同步至 Google Sheet</span>';
 
       if (!state.isHelperMode) {
         renderLogs();
@@ -1122,25 +1165,68 @@
       }
 
       try {
-        const formData = new FormData();
-        if (cfg.entryRole) formData.append(cfg.entryRole, payload.role);
-        if (cfg.entryDate) formData.append(cfg.entryDate, payload.date);
-        if (cfg.entryTime) formData.append(cfg.entryTime, payload.time);
-        if (cfg.entryCategory) formData.append(cfg.entryCategory, payload.category);
-        if (cfg.entryDetails) formData.append(cfg.entryDetails, payload.details);
-        if (cfg.entryDiaper) formData.append(cfg.entryDiaper, payload.diaper);
-        if (cfg.entryNotes) formData.append(cfg.entryNotes, payload.notes);
+        const params = new URLSearchParams();
+        if (cfg.entryRole) params.append(cfg.entryRole, payload.role);
+        if (cfg.entryDate) params.append(cfg.entryDate, payload.date);
+        if (cfg.entryTime) params.append(cfg.entryTime, payload.time);
+        if (cfg.entryCategory) params.append(cfg.entryCategory, payload.category);
+        if (cfg.entryDetails) params.append(cfg.entryDetails, payload.details);
+        if (cfg.entryDiaper) params.append(cfg.entryDiaper, payload.diaper);
+        if (cfg.entryNotes) params.append(cfg.entryNotes, payload.notes);
 
-        // Google Forms requires no-cors mode from browser origins; response is opaque on success
         await fetch(cfg.formUrl, {
           method: 'POST',
           mode: 'no-cors',
-          body: formData
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+          },
+          body: params.toString()
         });
         return true;
       } catch (err) {
         console.error('Google Form sync failed:', err);
         return false;
+      }
+    }
+
+    function updateOfflineQueueBanner() {
+      const unsyncedCount = state.logs.filter(l => !l.synced).length;
+      const banner = document.getElementById('offline-queue-banner');
+      if (unsyncedCount > 0) {
+        document.getElementById('offline-queue-count').textContent = unsyncedCount;
+        banner.classList.remove('hidden');
+      } else {
+        banner.classList.add('hidden');
+      }
+    }
+
+    async function retryUnsyncedEntries(silent = false) {
+      const unsynced = state.logs.filter(l => !l.synced);
+      if (unsynced.length === 0) return;
+
+      let successCount = 0;
+      for (const item of unsynced) {
+        const ok = await postToGoogleForm({
+          role: item.role,
+          date: item.date,
+          time: item.time,
+          category: item.category,
+          details: item.details,
+          diaper: item.diaperStatus,
+          notes: item.notes
+        });
+        if (ok) {
+          item.synced = true;
+          successCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        saveLogsToStorage();
+        if (!state.isHelperMode) renderLogs();
+        if (!silent) showToast(`✅ 已成功補傳 ${successCount} 筆紀錄至 Google Sheet！`, 'success');
+      } else if (!silent) {
+        showToast('⚠️ 仍無法連線至雲端，請檢查網絡狀態', 'warning');
       }
     }
 
@@ -1240,8 +1326,8 @@
         const baseCat = item.baseCategory || item.category;
         const icon = baseCat.startsWith('飲奶') ? '🍼' : (iconMap[baseCat] || '📝');
         const syncBadge = item.synced
-          ? `<span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sage-50 text-sage-700 border border-sage-200">✅ 已同步 Google Form</span>`
-          : `<span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">⚠️ 僅本地暫存</span>`;
+          ? `<span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sage-50 text-sage-700 border border-sage-200">✅ 已同步 Google Sheet</span>`
+          : `<span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">⏳ 離線暫存</span>`;
 
         const detailBadge = item.details && item.details !== '-'
           ? `<span class="text-xs font-bold text-sage-700 bg-sage-50 px-2 py-0.5 rounded-lg">${item.details}</span>`
@@ -1314,7 +1400,7 @@
         `"${l.details}"`,
         `"${l.diaperStatus}"`,
         `"${(l.notes || '').replace(/"/g, '""')}"`,
-        `"${l.synced ? '已同步' : '本地暫存'}"`
+        `"${l.synced ? '已同步' : '離線暫存'}"`
       ].join(','));
 
       const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
@@ -1329,7 +1415,7 @@
     }
 
     // ==========================================
-    // Google Form Auto-Parser & Configuration
+    // Built-in Config, Helper Share URL & PIN
     // ==========================================
     function populateConfigInputs() {
       const cfg = state.gformConfig;
@@ -1342,96 +1428,32 @@
       document.getElementById('cfg-entry-diaper').value = cfg.entryDiaper || '';
       document.getElementById('cfg-entry-notes').value = cfg.entryNotes || '';
       document.getElementById('cfg-parent-pin').value = state.parentPin;
+
+      // Build dedicated Helper locked link based on current URL
+      const baseUrl = `${window.location.origin}${window.location.pathname}`;
+      document.getElementById('helper-share-url').value = `${baseUrl}?mode=helper`;
     }
 
-    function updateSyncBadge() {
-      const pill = document.getElementById('sync-indicator-pill');
-      if (state.gformConfig.formUrl && state.gformConfig.formUrl.includes('docs.google.com/forms')) {
-        pill.className = 'text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-sage-50 text-sage-700 border border-sage-200';
-        pill.textContent = '☁️ Google Form 已連線';
-      } else {
-        pill.className = 'text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200';
-        pill.textContent = '⚠️ 未設定 Google Form';
-      }
-    }
-
-    function parsePrefilledUrl() {
-      const rawUrl = document.getElementById('prefill-url-input').value.trim();
-      if (!rawUrl) {
-        showToast('⚠️ 請先貼上 Google Form 預填連結', 'warning');
-        return;
-      }
-
+    function copyHelperLink() {
+      const input = document.getElementById('helper-share-url');
+      input.select();
+      input.setSelectionRange(0, 99999);
       try {
-        const urlObj = new URL(rawUrl);
-        // Convert /viewform to /formResponse
-        const baseEndpoint = `${urlObj.origin}${urlObj.pathname.replace(/\/viewform\/?$/, '/formResponse')}`;
-        document.getElementById('cfg-form-url').value = baseEndpoint;
-
-        // Extract unique entry.xxxxx keys in order
-        const entryKeys = [];
-        for (const [key] of urlObj.searchParams.entries()) {
-          if (key.startsWith('entry.') && !entryKeys.includes(key)) {
-            // Exclude Google Form internal sentinel fields if present
-            if (!key.endsWith('_sentinel')) {
-              entryKeys.push(key);
-            }
-          }
-        }
-
-        const fieldIds = [
-          'cfg-entry-role',
-          'cfg-entry-date',
-          'cfg-entry-time',
-          'cfg-entry-category',
-          'cfg-entry-details',
-          'cfg-entry-diaper',
-          'cfg-entry-notes'
-        ];
-
-        fieldIds.forEach((domId, index) => {
-          if (entryKeys[index]) {
-            document.getElementById(domId).value = entryKeys[index];
-          }
-        });
-
-        saveGoogleFormConfig();
-        showToast(`✨ 成功解析端點與 ${entryKeys.length} 個欄位代碼！`, 'success');
+        document.execCommand('copy');
+        showToast('📋 已複製「傭人專用鎖定網址」，可直接傳至 WhatsApp！', 'success');
       } catch (e) {
-        showToast('❌ 網址格式無法辨識，請確認貼上完整連結', 'error');
+        showToast('⚠️ 複製失敗，請手動選取網址複製', 'warning');
       }
     }
 
-    function saveGoogleFormConfig() {
-      let url = document.getElementById('cfg-form-url').value.trim();
-      if (url.endsWith('/viewform')) {
-        url = url.replace(/\/viewform$/, '/formResponse');
-        document.getElementById('cfg-form-url').value = url;
-      }
-
-      state.gformConfig = {
-        formUrl: url,
-        entryRole: document.getElementById('cfg-entry-role').value.trim(),
-        entryDate: document.getElementById('cfg-entry-date').value.trim(),
-        entryTime: document.getElementById('cfg-entry-time').value.trim(),
-        entryCategory: document.getElementById('cfg-entry-category').value.trim(),
-        entryDetails: document.getElementById('cfg-entry-details').value.trim(),
-        entryDiaper: document.getElementById('cfg-entry-diaper').value.trim(),
-        entryNotes: document.getElementById('cfg-entry-notes').value.trim()
-      };
-
+    function resetToDefaultConfig() {
+      state.gformConfig = { ...DEFAULT_GFORM_CONFIG };
       localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(state.gformConfig));
-      updateSyncBadge();
-      showToast('💾 Google Form 同步設定已儲存', 'success');
+      populateConfigInputs();
+      showToast('✅ 已還原為內建 Google Form 預設設定', 'success');
     }
 
     async function sendTestSubmission() {
-      saveGoogleFormConfig();
-      if (!state.gformConfig.formUrl) {
-        showToast('⚠️ 請先填寫 Google Form 網址', 'warning');
-        return;
-      }
-
       const now = new Date();
       const dateStr = now.toISOString().slice(0, 10);
       const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -1440,8 +1462,8 @@
         role: '爸爸 Dad',
         date: dateStr,
         time: timeStr,
-        category: '飲奶 Feeding',
-        details: '90ml (連線測試)',
+        category: '飲奶 - 配方奶 Formula',
+        details: '90ml (內建同步測試)',
         diaper: '不適用 N/A',
         notes: '來自寶寶日常紀錄網頁小程式的連線測試'
       });
@@ -1449,7 +1471,7 @@
       if (ok) {
         showToast('🚀 測試數據已送出！請檢查您的 Google Sheet 是否新增一列', 'success');
       } else {
-        showToast('❌ 發送失敗，請檢查網址是否正確', 'error');
+        showToast('❌ 發送失敗，請檢查網絡狀態', 'error');
       }
     }
 
